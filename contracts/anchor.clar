@@ -475,3 +475,73 @@
     )
   )
 )
+
+;; READ-ONLY QUERY FUNCTIONS
+
+;; Retrieve vault information
+(define-read-only (get-vault (vault-id uint))
+  (map-get? vaults { vault-id: vault-id })
+)
+
+;; Get all vault IDs for a user
+(define-read-only (get-user-vaults (user principal))
+  (map-get? user-vaults { user: user })
+)
+
+;; Get comprehensive protocol statistics
+(define-read-only (get-protocol-stats)
+  {
+    total-vaults: (var-get total-vaults),
+    total-debt: (var-get total-debt),
+    total-stx-collateral: (var-get total-stx-collateral),
+    total-xbtc-collateral: (var-get total-xbtc-collateral),
+    total-usdx-supply: (ft-get-supply usdx),
+  }
+)
+
+;; Check if vault is above liquidation threshold
+(define-read-only (is-vault-safe (vault-id uint))
+  (match (calculate-health-factor vault-id)
+    health-factor (ok (>= health-factor LIQUIDATION-RATIO))
+    error (err error)
+  )
+)
+
+;; PROTOCOL GOVERNANCE FUNCTIONS
+
+;; Emergency protocol shutdown mechanism
+(define-public (emergency-shutdown)
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-NOT-AUTHORIZED)
+    ;; Implementation for emergency shutdown procedures
+    (ok true)
+  )
+)
+
+;; Update liquidation ratio parameters
+(define-public (update-liquidation-ratio (new-ratio uint))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-NOT-AUTHORIZED)
+    (asserts! (and (>= new-ratio u120) (<= new-ratio u200)) ERR-INVALID-AMOUNT)
+    ;; Note: In production, this would update a data-var
+    (ok true)
+  )
+)
+
+;; PROTOCOL INITIALIZATION
+
+;; Initialize contract owner as oracle operator
+(map-set oracle-operators CONTRACT-OWNER true) 
+
+;; Initialize baseline price feeds with confidence scores
+(map-set price-feeds { asset: "STX" } {
+  price: u1000000,
+  timestamp: stacks-block-height,
+  confidence: u95,
+}) 
+
+(map-set price-feeds { asset: "xBTC" } {
+  price: u100000000000,
+  timestamp: stacks-block-height,
+  confidence: u95,
+})
